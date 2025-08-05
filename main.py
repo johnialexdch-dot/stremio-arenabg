@@ -27,7 +27,7 @@ def manifest():
             "name": "ArenaBG Search",
             "extra": [{"name": "search", "isRequired": True}]
         }],
-        "idPrefixes": ["tt"],
+        "idPrefixes": ["arenabg"],
         "behaviorHints": {"configurationRequired": False}
     }
 
@@ -41,6 +41,9 @@ def catalog(type: str, id: str, search: str = ""):
 
     headers = {"User-Agent": "Mozilla/5.0"}
     r = requests.get(url, headers=headers)
+    if r.status_code != 200:
+        return JSONResponse(content={"metas": []})
+
     soup = BeautifulSoup(r.text, "html.parser")
 
     metas = []
@@ -52,11 +55,16 @@ def catalog(type: str, id: str, search: str = ""):
             continue
 
         title_tag = cols[1].find("a")
+        if not title_tag:
+            continue
+
         title = title_tag.text.strip()
         link = title_tag.get("href")
+        if not link:
+            continue
+
         full_link = BASE_URL + link
 
-        # използваме href като unique id
         metas.append({
             "id": full_link,
             "name": title,
@@ -73,6 +81,9 @@ def stream(type: str, id: str):
 
     headers = {"User-Agent": "Mozilla/5.0"}
     r = requests.get(url, headers=headers)
+    if r.status_code != 200:
+        return JSONResponse(content={"streams": []})
+
     soup = BeautifulSoup(r.text, "html.parser")
 
     magnet = ""
