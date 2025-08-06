@@ -7,6 +7,16 @@ from urllib.parse import parse_qs, urlparse
 
 app = FastAPI()
 
+from fastapi.middleware.cors import CORSMiddleware
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # За тестове - позволява всички домейни
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 BASE_URL = "https://arenabg.com"
 LOGIN_URL = f"{BASE_URL}/bg/users/signin/"
 
