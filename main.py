@@ -77,7 +77,7 @@ def manifest():
 @app.get("/catalog/{type}/{id}.json")
 def catalog(type: str, id: str, search: str = ""):
     if not logged_in:
-        return JSONResponse(content={"metas": []})
+        return JSONResponse(content={"metas": [no logged]})
 
     if id != "arenabg_catalog" or not search:
         return JSONResponse(content={"metas": []})
@@ -108,6 +108,10 @@ def catalog(type: str, id: str, search: str = ""):
         })
 
     return JSONResponse(content={"metas": metas})
+     r = self.session.get(url, headers=headers)
+    print(f"Search page status: {r.status_code}")
+    print("Search page HTML preview:", r.text[:1000])  # показва първите 1000 символа
+    # ... обработка и връщане на резултати ...
 
 @app.get("/stream/{type}/{id}.json")
 def stream(type: str, id: str):
