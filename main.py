@@ -9,7 +9,6 @@ app = FastAPI()
 BASE_URL = "https://arenabg.com"
 LOGIN_URL = f"{BASE_URL}/bg/users/signin/"
 
-# ЗАДАЙ си правилно потребител и парола тук
 ARENABG_USERNAME = "uxada"
 ARENABG_PASSWORD = "P@rola123456"
 
@@ -22,7 +21,6 @@ class ArenaBGSession:
     def login(self):
         resp = self.session.get(LOGIN_URL)
         soup = BeautifulSoup(resp.text, "html.parser")
-
         csrf_input = soup.find("input", {"name": "csrf_token"})
         csrf_token = csrf_input["value"] if csrf_input else ""
 
@@ -43,16 +41,17 @@ class ArenaBGSession:
             return True
 
     def search_torrents(self, query):
-    search_url = f"{BASE_URL}/bg/torrents/?text={urllib.parse.quote_plus(query)}"
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-        "Referer": BASE_URL
-    }
-    resp = self.session.get(search_url, headers=headers)
-    print("Search status:", resp.status_code)
-    print("Search HTML preview:", resp.text[:2000])
-    return resp.text
+        search_url = f"{BASE_URL}/bg/torrents/?text={urllib.parse.quote_plus(query)}"
+        headers = {
+            "User-Agent": "Mozilla/5.0",
+            "Referer": BASE_URL
+        }
+        resp = self.session.get(search_url, headers=headers)
+        print("Search status:", resp.status_code)
+        print("Search HTML preview:", resp.text[:2000])
+        return resp.text
 
+# Създаваме сесия и логваме при стартиране
 arenabg = ArenaBGSession(ARENABG_USERNAME, ARENABG_PASSWORD)
 logged_in = arenabg.login()
 
@@ -81,7 +80,10 @@ def manifest():
 
 @app.get("/catalog/{type}/{id}.json")
 def catalog(type: str, id: str, search: str = ""):
-    if not logged_in or id != "arenabg_catalog" or not search:
+    if not logged_in:
+        return JSONResponse(content={"metas": []})
+
+    if id != "arenabg_catalog" or not search:
         return JSONResponse(content={"metas": []})
 
     html = arenabg.search_torrents(search)
@@ -103,7 +105,7 @@ def catalog(type: str, id: str, search: str = ""):
         full_link = BASE_URL + link
 
         metas.append({
-            "id": urllib.parse.quote(full_link),
+            "id": full_link,
             "name": title,
             "type": type,
             "poster": "https://arenabg.com/favicon.ico"
@@ -113,10 +115,11 @@ def catalog(type: str, id: str, search: str = ""):
 
 @app.get("/stream/{type}/{id}.json")
 def stream(type: str, id: str):
+    url = urllib.parse.unquote(id)
+
     if not logged_in:
         return JSONResponse(content={"streams": []})
 
-    url = urllib.parse.unquote(id)
     r = arenabg.session.get(url)
     soup = BeautifulSoup(r.text, "html.parser")
 
