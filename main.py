@@ -27,23 +27,27 @@ class ZamundaSession:
         self.username = username
         self.password = password
         self.login_url = LOGIN_URL
-
+        
     def login(self):
-        payload = {
-            "username": self.username,
-            "password": self.password,
-        }
-        headers = {
-            "User-Agent": "Mozilla/5.0",
-            "Referer": self.login_url
-        }
-        resp = self.session.post(self.login_url, data=payload, headers=headers)
-        if self.username.lower() in resp.text.lower():
-            print("✅ Успешен вход в Zamunda")
-            return True
-        else:
-            print("❌ Неуспешен вход в Zamunda")
-            return False
+    payload = {
+        "username": self.username,
+        "password": self.password,
+    }
+    headers = {
+        "User-Agent": "Mozilla/5.0",
+        "Referer": self.login_url
+    }
+    resp = self.session.post(self.login_url, data=payload, headers=headers)
+    print(f"Login response status: {resp.status_code}")
+    print(f"Login response URL: {resp.url}")
+    print(f"Login response text snippet: {resp.text[:500]}")
+
+    if self.username.lower() in resp.text.lower():
+        print("✅ Успешен вход в Zamunda")
+        return True
+    else:
+        print("❌ Неуспешен вход в Zamunda")
+        return False
 
     def search_torrents(self, query):
         search_url = f"{BASE_URL}/search.php?szukaj={urllib.parse.quote_plus(query)}"
