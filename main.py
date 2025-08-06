@@ -129,30 +129,23 @@ def catalog(type: str, id: str, search: str = ""):
     return {"metas": metas}
 
 
-@app.get("/stream/{type}/{id}.json")
-def stream(type: str, id: str):
-    url = urllib.parse.unquote(id)
+from fastapi import Query
 
+@app.get("/stream/{type}.json")
+def stream(type: str, url: str = Query(...)):
+    # url идва като чиста стойност, примерно: https://arenabg.com/bg/torrents/SlRhU3huNU5la0txWWhwRnRldzRzZz09OjrMJNqBnTjT9bxZLVlHr0jE/
+    
     if not logged_in:
         return {"streams": []}
 
     r = arenabg.session.get(url)
-    html = r.text
-
-    print("Stream page HTML preview:", html[:2000])  # показва първите 2000 символа
-
-    soup = BeautifulSoup(html, "html.parser")
+    soup = BeautifulSoup(r.text, "html.parser")
 
     magnet = ""
     for a in soup.find_all("a", href=True):
         if a["href"].startswith("magnet:"):
             magnet = a["href"]
             break
-
-    if magnet:
-        print("Magnet link found:", magnet)
-    else:
-        print("No magnet link found.")
 
     streams = []
     if magnet:
@@ -165,4 +158,3 @@ def stream(type: str, id: str):
         })
 
     return {"streams": streams}
-
