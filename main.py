@@ -128,3 +128,40 @@ def stream(type: str, id: str, url: str = None):
     except Exception as e:
         print(f"⚠️ Грешка при стрийм обработка: {e}")
         return {"streams": []}
+
+@app.get("/catalog/{type}/{id}.json")
+def catalog(type: str, id: str, search: str = ""):
+    if id != "arenabg_catalog" or type != "movie" or not search:
+        return {"metas": []}
+
+    print(f"🔎 Търсене в ArenaBG: {search}")
+
+    try:
+        search_url = f"{BASE_URL}/bg/torrents?q={urllib.parse.quote(search)}"
+        html = arenabg.get_page(search_url)
+        soup = BeautifulSoup(html, "html.parser")
+
+        results = []
+        rows = soup.select("div.search-torrent")
+
+        for row in rows:
+            a_tag = row.find("a", href=True)
+            title = a_tag.text.strip()
+            href = a_tag["href"]
+            full_url = urllib.parse.urljoin(BASE_URL, href)
+
+            img = row.find("img")
+            poster = img["src"] if img else ""
+
+            results.append({
+                "id": full_url,
+                "name": title,
+                "poster": poster
+            })
+
+        return {"metas": results}
+
+    except Exception as e:
+        print(f"⚠️ Грешка при търсене: {e}")
+        return {"metas": []}
+
