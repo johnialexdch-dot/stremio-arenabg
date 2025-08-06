@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from bs4 import BeautifulSoup
 import requests
@@ -9,7 +9,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # за тестове
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -21,7 +21,7 @@ LOGIN_URL = f"{BASE_URL}/bg/users/signin/"
 ARENABG_USERNAME = "uxada"
 ARENABG_PASSWORD = "P@rola123456"
 
-TMDB_API_KEY = "5e812cae5bcf352dd5db9a0ca437fd17"  # Смени с твоя ако искаш
+TMDB_API_KEY = "5e812cae5bcf352dd5db9a0ca437fd17"  # смени с твоя ако искаш
 
 class ArenaBGSession:
     def __init__(self, username, password):
@@ -89,6 +89,38 @@ def manifest():
         "behaviorHints": {"configurationRequired": False}
     }
 
+@app.get("/catalog/{type}/{id}.json")
+def catalog(type: str, id: str, search: str = ""):
+    if id != "arenabg_catalog" or type != "movie" or not search:
+        return {"metas": []}
+
+    print(f"🔎 Търсене в ArenaBG: {search}")
+
+    try:
+        search_url = f"{BASE_URL}/bg/torrents/?text={urllib.parse.quote(search)}"
+        html = arenabg.get_page(search_url)
+        soup = BeautifulSoup(html, "html.parser")
+
+        metas = []
+        for t in soup.select("div.search-torrent"):
+            a = t.find("a", href=True)
+            if not a:
+                continue
+            title = a.text.strip()
+            link = urllib.parse.urljoin(BASE_URL, a["href"])
+            metas.append({
+                "id": link,
+                "type": "movie",
+                "name": title,
+                "poster": "https://stremio.com/img/movies.jpg"
+            })
+
+        return {"metas": metas}
+
+    except Exception as e:
+        print(f"⚠️ Грешка при търсене: {e}")
+        return {"metas": []}
+
 @app.get("/stream/{type}/{id}.json")
 def stream(type: str, id: str, url: str = None):
     if not logged_in:
@@ -128,40 +160,3 @@ def stream(type: str, id: str, url: str = None):
     except Exception as e:
         print(f"⚠️ Грешка при стрийм обработка: {e}")
         return {"streams": []}
-
-@app.get("/catalog/{type}/{id}.json")
-def catalog(type: str, id: str, search: str = ""):
-    if id != "arenabg_catalog" or type != "movie" or not search:
-        return {"metas": []}
-
-    print(f"🔎 Търсене в ArenaBG: {search}")
-
-    try:
-        search_url = f"{BASE_URL}/bg/torrents?q={urllib.parse.quote(search)}"
-        html = arenabg.get_page(search_url)
-        soup = BeautifulSoup(html, "html.parser")
-
-        results = []
-        rows = soup.select("div.search-torrent")
-
-        for row in rows:
-            a_tag = row.find("a", href=True)
-            title = a_tag.text.strip()
-            href = a_tag["href"]
-            full_url = urllib.parse.urljoin(BASE_URL, href)
-
-            img = row.find("img")
-            poster = img["src"] if img else ""
-
-            results.append({
-                "id": full_url,
-                "name": title,
-                "poster": poster
-            })
-
-        return {"metas": results}
-
-    except Exception as e:
-        print(f"⚠️ Грешка при търсене: {e}")
-        return {"metas": []}
-
