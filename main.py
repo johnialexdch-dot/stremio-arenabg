@@ -92,7 +92,7 @@ def manifest():
             "name": "ArenaBG Search",
             "extra": [{"name": "search", "isRequired": True}]
         }],
-        "idPrefixes": ["tt"],
+        #"idPrefixes": ["tt"],  # <--- премахнато
         "behaviorHints": {"configurationRequired": False}
     }
 
