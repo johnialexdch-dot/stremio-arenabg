@@ -18,8 +18,8 @@ app.add_middleware(
 BASE_URL = "https://zamunda.net"
 LOGIN_URL = f"{BASE_URL}/login.php"
 
-ZAMUNDA_USERNAME = "coyec75395"
-ZAMUNDA_PASSWORD = "rxM6N.h2N4aYe7_"
+ZAMUNDA_USERNAME = "coyec75395"        # смени с твоя потребител
+ZAMUNDA_PASSWORD = "rxM6N.h2N4aYe7_"  # смени с твоята парола
 
 class ZamundaSession:
     def __init__(self, username, password):
@@ -27,27 +27,27 @@ class ZamundaSession:
         self.username = username
         self.password = password
         self.login_url = LOGIN_URL
-        
-    def login(self):
-    payload = {
-        "username": self.username,
-        "password": self.password,
-    }
-    headers = {
-        "User-Agent": "Mozilla/5.0",
-        "Referer": self.login_url
-    }
-    resp = self.session.post(self.login_url, data=payload, headers=headers)
-    print(f"Login response status: {resp.status_code}")
-    print(f"Login response URL: {resp.url}")
-    print(f"Login response text snippet: {resp.text[:500]}")
 
-    if self.username.lower() in resp.text.lower():
-        print("✅ Успешен вход в Zamunda")
-        return True
-    else:
-        print("❌ Неуспешен вход в Zamunda")
-        return False
+    def login(self):
+        payload = {
+            "username": self.username,
+            "password": self.password,
+        }
+        headers = {
+            "User-Agent": "Mozilla/5.0",
+            "Referer": self.login_url
+        }
+        resp = self.session.post(self.login_url, data=payload, headers=headers)
+        print(f"Login response status: {resp.status_code}")
+        print(f"Login response URL: {resp.url}")
+        print(f"Login response text snippet: {resp.text[:500]}")
+
+        if self.username.lower() in resp.text.lower():
+            print("✅ Успешен вход в Zamunda")
+            return True
+        else:
+            print("❌ Неуспешен вход в Zamunda")
+            return False
 
     def search_torrents(self, query):
         search_url = f"{BASE_URL}/search.php?szukaj={urllib.parse.quote_plus(query)}"
