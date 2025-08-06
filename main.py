@@ -3,46 +3,53 @@ from fastapi.responses import JSONResponse
 from bs4 import BeautifulSoup
 import requests
 import urllib.parse
-import os
-from dotenv import load_dotenv
 
-# Зареждаме .env
-load_dotenv()
-
-USERNAME = os.getenv("ARENABG_USERNAME")
-PASSWORD = os.getenv("ARENABG_PASSWORD")
+app = FastAPI()
 
 BASE_URL = "https://arenabg.com"
 LOGIN_URL = f"{BASE_URL}/bg/users/signin/"
 
-session = requests.Session()
-app = FastAPI()
+# Въведете вашите ArenaBG потребител и парола тук
+ARENABG_USERNAME = "uxada"
+ARENABG_PASSWORD = "P@rola123456"
 
-def login():
-    """Логване в ArenaBG със session"""
-    try:
-        session.get(LOGIN_URL)  # взимане на cookies
+class ArenaBGSession:
+    def __init__(self, username, password):
+        self.session = requests.Session()
+        self.username = username
+        self.password = password
+
+    def login(self):
+        resp = self.session.get(LOGIN_URL)
+        soup = BeautifulSoup(resp.text, "html.parser")
+
+        csrf_input = soup.find("input", {"name": "csrf_token"})
+        csrf_token = csrf_input["value"] if csrf_input else ""
+
         payload = {
-            "username_or_email": USERNAME,
-            "password": PASSWORD
+            "username_or_email": self.username,
+            "password": self.password,
         }
-        headers = {
-            "User-Agent": "Mozilla/5.0",
-            "Referer": LOGIN_URL
-        }
-        response = session.post(LOGIN_URL, data=payload, headers=headers)
-        return response.status_code == 200 and "Изход" in response.text
-    except Exception as e:
-        print("Login error:", e)
-        return False
+        if csrf_token:
+            payload["csrf_token"] = csrf_token
 
-@app.on_event("startup")
-def startup_event():
-    success = login()
-    if success:
-        print("✅ Успешен вход в ArenaBG")
-    else:
-        print("❌ НЕуспешен вход в ArenaBG")
+        login_resp = self.session.post(LOGIN_URL, data=payload)
+
+        if "Вход" in login_resp.text or "signin" in login_resp.url:
+            print("❌ НЕуспешен вход в ArenaBG")
+            return False
+        else:
+            print("✅ Успешен вход в ArenaBG")
+            return True
+
+    def search_torrents(self, query):
+        search_url = f"{BASE_URL}/bg/torrents/?text={urllib.parse.quote_plus(query)}"
+        resp = self.session.get(search_url)
+        return resp.text
+
+# Създаваме сесия и логваме веднъж при стартиране на приложението
+arenabg = ArenaBGSession(ARENABG_USERNAME, ARENABG_PASSWORD)
+logged_in = arenabg.login()
 
 @app.get("/")
 def root():
@@ -69,25 +76,26 @@ def manifest():
 
 @app.get("/catalog/{type}/{id}.json")
 def catalog(type: str, id: str, search: str = ""):
+    if not logged_in:
+        return JSONResponse(content={"metas": []})
+
     if id != "arenabg_catalog" or not search:
         return JSONResponse(content={"metas": []})
 
-    query = urllib.parse.quote_plus(search)
-    url = f"{BASE_URL}/bg/torrents/?text={query}"
-
-    headers = {"User-Agent": "Mozilla/5.0"}
-    r = session.get(url, headers=headers)
-    soup = BeautifulSoup(r.text, "html.parser")
+    html = arenabg.search_torrents(search)
+    soup = BeautifulSoup(html, "html.parser")
 
     metas = []
     rows = soup.select("table.table-hover tbody tr")
-
     for row in rows[:20]:  # лимит до 20 резултата
         cols = row.find_all("td")
         if len(cols) < 2:
             continue
 
         title_tag = cols[1].find("a")
+        if not title_tag:
+            continue
+
         title = title_tag.text.strip()
         link = title_tag.get("href")
         full_link = BASE_URL + link
@@ -103,10 +111,13 @@ def catalog(type: str, id: str, search: str = ""):
 
 @app.get("/stream/{type}/{id}.json")
 def stream(type: str, id: str):
+    # id е пълния URL от catalog-а, трябва да го декодираме
     url = urllib.parse.unquote(id)
 
-    headers = {"User-Agent": "Mozilla/5.0"}
-    r = session.get(url, headers=headers)
+    if not logged_in:
+        return JSONResponse(content={"streams": []})
+
+    r = arenabg.session.get(url)
     soup = BeautifulSoup(r.text, "html.parser")
 
     magnet = ""
