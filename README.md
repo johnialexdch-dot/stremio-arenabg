@@ -1,9 +1,8 @@
 # Stremio ArenaBG Addon
 
-Stremio адон, който използва ArenaBG.com за търсене и стрийминг на торенти чрез magnet връзки.
+🎬 Stremio адон за търсене на торенти от [ArenaBG](https://arenabg.com)  
+🔐 Изисква потребител и парола от ArenaBG
 
 ## Стартиране
 
-```bash
-pip install -r requirements.txt
-uvicorn main:app --host 0.0.0.0 --port 7001
+
