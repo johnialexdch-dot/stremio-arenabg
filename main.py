@@ -43,14 +43,15 @@ class ArenaBGSession:
             return True
 
     def search_torrents(self, query):
-        search_url = f"{BASE_URL}/bg/torrents/?text={urllib.parse.quote_plus(query)}"
-        headers = {
-            "User-Agent": "Mozilla/5.0"
-        }
-        r = self.session.get(search_url, headers=headers)
-        print(f"Search page status: {r.status_code}")
-        print("Search page HTML preview:", r.text[:1000])
-        return r.text
+    search_url = f"{BASE_URL}/bg/torrents/?text={urllib.parse.quote_plus(query)}"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+        "Referer": BASE_URL
+    }
+    resp = self.session.get(search_url, headers=headers)
+    print("Search status:", resp.status_code)
+    print("Search HTML preview:", resp.text[:2000])
+    return resp.text
 
 arenabg = ArenaBGSession(ARENABG_USERNAME, ARENABG_PASSWORD)
 logged_in = arenabg.login()
