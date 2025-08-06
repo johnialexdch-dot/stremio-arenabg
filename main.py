@@ -1,15 +1,16 @@
-from fastapi import FastAPI, Query
+from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from bs4 import BeautifulSoup
 import requests
 import urllib.parse
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, urlparse, unquote
 
 app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # За тестове - позволява всички домейни
+    allow_origins=["*"],  # за тестове
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -84,7 +85,6 @@ def manifest():
         "name": "ArenaBG",
         "description": "Stremio адон за търсене на торенти от ArenaBG",
         "resources": ["catalog", "stream"],
-        "streamsExtra": [{"name": "url", "isRequired": True}],
         "types": ["movie", "series"],
         "catalogs": [{
             "type": "movie",
@@ -129,7 +129,7 @@ def catalog(type: str, id: str, search: str = ""):
                 pass
 
         metas.append({
-            "id": full_url,
+            "id": full_url,  # тук слагаме пълния URL
             "name": title,
             "type": type,
             "poster": poster or "https://arenabg.com/favicon.ico"
@@ -137,13 +137,13 @@ def catalog(type: str, id: str, search: str = ""):
 
     return {"metas": metas}
 
-@app.get("/stream/{type}.json")
-def stream(type: str, url: str = Query(...)):
-    print("Received stream request for type:", type, "url:", url)
 
+@app.get("/stream/{type}/{id}.json")
+def stream(type: str, id: str):
     if not logged_in:
-        print("Not logged in, returning empty streams")
         return {"streams": []}
+
+    url = unquote(id)  # decode URL-encoded id
 
     r = arenabg.session.get(url)
     soup = BeautifulSoup(r.text, "html.parser")
@@ -154,8 +154,6 @@ def stream(type: str, url: str = Query(...)):
             magnet = a["href"]
             break
 
-    print("Magnet link found:", magnet)
-
     streams = []
     if magnet:
         info_hash = extract_info_hash(magnet)
@@ -165,12 +163,5 @@ def stream(type: str, url: str = Query(...)):
             "fileIdx": 0,
             "url": magnet
         })
-    else:
-        print("No magnet link found for this URL.")
 
     return {"streams": streams}
-
-# Тестов fallback, за да не връща 404 при заявка към /stream/{type}/{id}.json
-@app.get("/stream/{type}/{id}.json")
-def stream_with_id(type: str, id: str):
-    return {"streams": []}
