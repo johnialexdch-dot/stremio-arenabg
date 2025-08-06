@@ -1,10 +1,9 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
 from bs4 import BeautifulSoup
-from arenabg_parser import parse_arenabg_html
+from arenabg_parser import parse_arenabg_html  # ако имаш тази функция
 import requests
 import urllib.parse
-
 
 app = FastAPI()
 
@@ -50,10 +49,9 @@ class ArenaBGSession:
         }
         resp = self.session.get(search_url, headers=headers)
         print("Search status:", resp.status_code)
-        print("Search HTML preview:", resp.text[:2000])
+        print("Search HTML preview:", resp.text[:500])  # по-малко, за четимост
         return resp.text
 
-# Създаваме сесия и логваме при стартиране
 arenabg = ArenaBGSession(ARENABG_USERNAME, ARENABG_PASSWORD)
 logged_in = arenabg.login()
 
@@ -83,12 +81,17 @@ def manifest():
 @app.get("/catalog/{type}/{id}.json")
 def catalog(type: str, id: str, search: str = ""):
     if not logged_in:
-        return JSONResponse(content={"metas": []})
+        return {"metas": []}
 
     if id != "arenabg_catalog" or not search:
-        return JSONResponse(content={"metas": []})
+        return {"metas": []}
 
     html = arenabg.search_torrents(search)
+
+    # Ако имаш функция parse_arenabg_html, използвай я:
+    # metas = parse_arenabg_html(html)
+
+    # Ако нямаш, използвай този парсинг:
     soup = BeautifulSoup(html, "html.parser")
 
     metas = []
@@ -113,14 +116,14 @@ def catalog(type: str, id: str, search: str = ""):
             "poster": "https://arenabg.com/favicon.ico"
         })
 
-    return JSONResponse(content={"metas": metas})
+    return {"metas": metas}
 
 @app.get("/stream/{type}/{id}.json")
 def stream(type: str, id: str):
     url = urllib.parse.unquote(id)
 
     if not logged_in:
-        return JSONResponse(content={"streams": []})
+        return {"streams": []}
 
     r = arenabg.session.get(url)
     soup = BeautifulSoup(r.text, "html.parser")
@@ -135,9 +138,9 @@ def stream(type: str, id: str):
     if magnet:
         streams.append({
             "title": "ArenaBG",
-            "infoHash": "",
+            "infoHash": "",  # Можеш да извадиш infoHash от магнит линка, ако искаш
             "fileIdx": 0,
             "url": magnet
         })
 
-    return JSONResponse(content={"streams": streams})
+    return {"streams": streams}
