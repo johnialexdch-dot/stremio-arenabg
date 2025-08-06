@@ -16,33 +16,30 @@ app.add_middleware(
 )
 
 BASE_URL = "https://zamunda.net"
-LOGIN_URL = f"{BASE_URL}/login.php"
+LOGIN_URL = f"{BASE_URL}/takelogin.php"
 
-ZAMUNDA_USERNAME = "coyec75395"        # смени с твоя потребител
-ZAMUNDA_PASSWORD = "rxM6N.h2N4aYe7_"  # смени с твоята парола
+ZAMUNDA_USERNAME = "coyec75395"
+ZAMUNDA_PASSWORD = "rxM6N.h2N4aYe7_"
 
 class ZamundaSession:
     def __init__(self, username, password):
         self.session = requests.Session()
         self.username = username
         self.password = password
+        self.base_url = BASE_URL
         self.login_url = LOGIN_URL
+        self.headers = {
+            'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:32.0) Gecko/20100101 Firefox/32.0'
+        }
 
     def login(self):
         payload = {
-            "username": self.username,
-            "password": self.password,
+            'username': self.username,
+            'password': self.password,
         }
-        headers = {
-            "User-Agent": "Mozilla/5.0",
-            "Referer": self.login_url
-        }
-        resp = self.session.post(self.login_url, data=payload, headers=headers)
-        print(f"Login response status: {resp.status_code}")
-        print(f"Login response URL: {resp.url}")
-        print(f"Login response text snippet: {resp.text[:500]}")
+        response = self.session.post(self.login_url, data=payload, headers=self.headers)
 
-        if self.username.lower() in resp.text.lower():
+        if response.status_code == requests.codes.ok and self.username.lower() in response.text.lower():
             print("✅ Успешен вход в Zamunda")
             return True
         else:
@@ -50,8 +47,8 @@ class ZamundaSession:
             return False
 
     def search_torrents(self, query):
-        search_url = f"{BASE_URL}/search.php?szukaj={urllib.parse.quote_plus(query)}"
-        resp = self.session.get(search_url)
+        search_url = f"{self.base_url}/search.php?szukaj={urllib.parse.quote_plus(query)}"
+        resp = self.session.get(search_url, headers=self.headers)
         return resp.text
 
 zamunda = ZamundaSession(ZAMUNDA_USERNAME, ZAMUNDA_PASSWORD)
