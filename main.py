@@ -1,13 +1,11 @@
-from fastapi import FastAPI
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, Query
+from fastapi.middleware.cors import CORSMiddleware
 from bs4 import BeautifulSoup
 import requests
 import urllib.parse
 from urllib.parse import parse_qs, urlparse
 
 app = FastAPI()
-
-from fastapi.middleware.cors import CORSMiddleware
 
 app.add_middleware(
     CORSMiddleware,
@@ -86,7 +84,7 @@ def manifest():
         "name": "ArenaBG",
         "description": "Stremio адон за търсене на торенти от ArenaBG",
         "resources": ["catalog", "stream"],
-        "streamsExtra": [{"name": "url", "isRequired": True}],  # <- Добавено тук
+        "streamsExtra": [{"name": "url", "isRequired": True}],
         "types": ["movie", "series"],
         "catalogs": [{
             "type": "movie",
@@ -139,14 +137,12 @@ def catalog(type: str, id: str, search: str = ""):
 
     return {"metas": metas}
 
-
-from fastapi import Query
-
 @app.get("/stream/{type}.json")
 def stream(type: str, url: str = Query(...)):
-    # url идва като чиста стойност, примерно: https://arenabg.com/bg/torrents/SlRhU3huNU5la0txWWhwRnRldzRzZz09OjrMJNqBnTjT9bxZLVlHr0jE/
-    
+    print("Received stream request for type:", type, "url:", url)
+
     if not logged_in:
+        print("Not logged in, returning empty streams")
         return {"streams": []}
 
     r = arenabg.session.get(url)
@@ -158,6 +154,8 @@ def stream(type: str, url: str = Query(...)):
             magnet = a["href"]
             break
 
+    print("Magnet link found:", magnet)
+
     streams = []
     if magnet:
         info_hash = extract_info_hash(magnet)
@@ -167,10 +165,12 @@ def stream(type: str, url: str = Query(...)):
             "fileIdx": 0,
             "url": magnet
         })
+    else:
+        print("No magnet link found for this URL.")
 
     return {"streams": streams}
 
+# Тестов fallback, за да не връща 404 при заявка към /stream/{type}/{id}.json
 @app.get("/stream/{type}/{id}.json")
 def stream_with_id(type: str, id: str):
-    # Връщаме празен отговор, за да не дава 404
     return {"streams": []}
