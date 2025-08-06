@@ -1,9 +1,9 @@
-from fastapi import FastAPI, Query
+from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from bs4 import BeautifulSoup
-from arenabg_parser import parse_arenabg_html  # ако имаш тази функция
 import requests
 import urllib.parse
+from urllib.parse import parse_qs, urlparse
 
 app = FastAPI()
 
@@ -49,11 +49,20 @@ class ArenaBGSession:
         }
         resp = self.session.get(search_url, headers=headers)
         print("Search status:", resp.status_code)
-        print("Search HTML preview:", resp.text[:500])  # по-малко, за четимост
+        print("Search HTML preview:", resp.text[:500])
         return resp.text
 
 arenabg = ArenaBGSession(ARENABG_USERNAME, ARENABG_PASSWORD)
 logged_in = arenabg.login()
+
+def extract_info_hash(magnet_link):
+    try:
+        xt = parse_qs(urlparse(magnet_link).query).get("xt", [None])[0]
+        if xt and "urn:btih:" in xt:
+            return xt.split("urn:btih:")[1]
+    except:
+        pass
+    return ""
 
 @app.get("/")
 def root():
@@ -87,11 +96,6 @@ def catalog(type: str, id: str, search: str = ""):
         return {"metas": []}
 
     html = arenabg.search_torrents(search)
-
-    # Ако имаш функция parse_arenabg_html, използвай я:
-    # metas = parse_arenabg_html(html)
-
-    # Ако нямаш, използвай този парсинг:
     soup = BeautifulSoup(html, "html.parser")
 
     metas = []
@@ -109,11 +113,20 @@ def catalog(type: str, id: str, search: str = ""):
         link = title_tag.get("href")
         full_link = BASE_URL + link
 
+        # 🔽 Извличане на изображението от onmouseover
+        onmouseover = title_tag.get("onmouseover", "")
+        poster = ""
+        if "https://" in onmouseover:
+            try:
+                poster = onmouseover.split('"')[1]
+            except:
+                poster = ""
+
         metas.append({
             "id": full_link,
             "name": title,
             "type": type,
-            "poster": "https://arenabg.com/favicon.ico"
+            "poster": poster or "https://arenabg.com/favicon.ico"
         })
 
     return {"metas": metas}
@@ -136,9 +149,10 @@ def stream(type: str, id: str):
 
     streams = []
     if magnet:
+        info_hash = extract_info_hash(magnet)
         streams.append({
             "title": "ArenaBG",
-            "infoHash": "",  # Можеш да извадиш infoHash от магнит линка, ако искаш
+            "infoHash": info_hash,
             "fileIdx": 0,
             "url": magnet
         })
