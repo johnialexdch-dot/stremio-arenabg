@@ -169,3 +169,9 @@ def stream(type: str, url: str = Query(...)):
         })
 
     return {"streams": streams}
+
+@app.get("/stream/{type}/{id}.json")
+def stream_with_id(type: str, id: str):
+    # Връщаме празен отговор, за да не дава 404
+    return {"streams": []}
+
