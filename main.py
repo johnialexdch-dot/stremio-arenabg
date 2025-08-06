@@ -21,7 +21,7 @@ class ArenaBG:
     def login(self):
         # Тук сложи правилния си логин, примерно:
         url_login = "https://arenabg.com/login"
-        data = {"username": "твоето_потребителско_име", "password": "твоят_парола"}
+        data = {"username": "uxada", "password": "P@rola123456"}
         r = self.session.post(url_login, data=data)
         if r.ok:
             print("✅ Успешен вход в ArenaBG")
