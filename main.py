@@ -86,6 +86,7 @@ def manifest():
         "name": "ArenaBG",
         "description": "Stremio адон за търсене на торенти от ArenaBG",
         "resources": ["catalog", "stream"],
+        "streamsExtra": [{"name": "url", "isRequired": True}],
         "types": ["movie", "series"],
         "catalogs": [{
             "type": "movie",
