@@ -1,167 +1,115 @@
 from fastapi import FastAPI
-from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from bs4 import BeautifulSoup
 import requests
-import urllib.parse
-from urllib.parse import parse_qs, urlparse, unquote
+from urllib.parse import unquote
+from bs4 import BeautifulSoup
 
 app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # за тестове
-    allow_credentials=True,
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-BASE_URL = "https://arenabg.com"
-LOGIN_URL = f"{BASE_URL}/bg/users/signin/"
-
-ARENABG_USERNAME = "uxada"
-ARENABG_PASSWORD = "P@rola123456"
-
-class ArenaBGSession:
-    def __init__(self, username, password):
+class ArenaBG:
+    def __init__(self):
         self.session = requests.Session()
-        self.username = username
-        self.password = password
+        self.login()
 
     def login(self):
-        resp = self.session.get(LOGIN_URL)
-        soup = BeautifulSoup(resp.text, "html.parser")
-        csrf_input = soup.find("input", {"name": "csrf_token"})
-        csrf_token = csrf_input["value"] if csrf_input else ""
-
-        payload = {
-            "username_or_email": self.username,
-            "password": self.password,
-        }
-        if csrf_token:
-            payload["csrf_token"] = csrf_token
-
-        login_resp = self.session.post(LOGIN_URL, data=payload)
-
-        if "Вход" in login_resp.text or "signin" in login_resp.url:
-            print("❌ НЕуспешен вход в ArenaBG")
-            return False
-        else:
+        # Тук сложи правилния си логин, примерно:
+        url_login = "https://arenabg.com/login"
+        data = {"username": "твоето_потребителско_име", "password": "твоят_парола"}
+        r = self.session.post(url_login, data=data)
+        if r.ok:
             print("✅ Успешен вход в ArenaBG")
-            return True
+        else:
+            print("❌ Грешка при вход в ArenaBG")
 
-    def search_torrents(self, query):
-        search_url = f"{BASE_URL}/bg/torrents/?text={urllib.parse.quote_plus(query)}"
-        headers = {
-            "User-Agent": "Mozilla/5.0",
-            "Referer": BASE_URL
-        }
-        resp = self.session.get(search_url, headers=headers)
-        print("Search status:", resp.status_code)
-        print("Search HTML preview:", resp.text[:500])
-        return resp.text
+    def search(self, query):
+        # Тук примерно търсене (примерна имплементация)
+        search_url = f"https://arenabg.com/search/{query}"
+        r = self.session.get(search_url)
+        soup = BeautifulSoup(r.text, "html.parser")
+        # Парсване на резултати...
+        # Върни списък от резултати с id като пълния URL към стрийм
+        results = []
+        for item in soup.select(".torrent-row"):  # примерен CSS селектор
+            title = item.select_one(".torrent-title").text.strip()
+            link = item.select_one("a")["href"]
+            full_url = "https://arenabg.com" + link
+            results.append({
+                "id": full_url,
+                "name": title,
+                "poster": None,
+            })
+        return results
 
-arenabg = ArenaBGSession(ARENABG_USERNAME, ARENABG_PASSWORD)
-logged_in = arenabg.login()
-
-def extract_info_hash(magnet_link):
-    try:
-        xt = parse_qs(urlparse(magnet_link).query).get("xt", [None])[0]
-        if xt and "urn:btih:" in xt:
-            return xt.split("urn:btih:")[1]
-    except:
-        pass
-    return ""
-
-@app.get("/")
-def root():
-    return {"status": "ArenaBG addon is running"}
+arenabg = ArenaBG()
 
 @app.get("/manifest.json")
-def manifest():
+async def manifest():
     return {
         "id": "org.stremio.arenabg",
         "version": "1.0.0",
         "name": "ArenaBG",
-        "description": "Stremio адон за търсене на торенти от ArenaBG",
+        "description": "Addon за филми и сериали от arenabg.com",
         "resources": ["catalog", "stream"],
         "types": ["movie", "series"],
-        "catalogs": [{
-            "type": "movie",
-            "id": "arenabg_catalog",
-            "name": "ArenaBG Search",
-            "extra": [{"name": "search", "isRequired": True}]
-        }],
-        #"idPrefixes": ["tt"],  # <--- премахнато
-        "behaviorHints": {"configurationRequired": False}
+        "catalogs": [
+            {
+                "type": "movie",
+                "id": "arenabg_movies",
+                "name": "ArenaBG Филми"
+            },
+            {
+                "type": "series",
+                "id": "arenabg_series",
+                "name": "ArenaBG Сериали"
+            }
+        ]
+        # ВНИМАНИЕ: НЕ слагай "idPrefixes"
     }
 
 @app.get("/catalog/{type}/{id}.json")
-def catalog(type: str, id: str, search: str = ""):
-    if not logged_in:
-        return {"metas": []}
-
-    if id != "arenabg_catalog" or not search:
-        return {"metas": []}
-
-    html = arenabg.search_torrents(search)
-    soup = BeautifulSoup(html, "html.parser")
-
-    rows = soup.find_all("tr")
-    metas = []
-
-    for row in rows[:20]:
-        a_tag = row.find("a", class_="title")
-        if not a_tag:
-            continue
-
-        title = a_tag.text.strip()
-        href = a_tag.get("href")
-        full_url = BASE_URL + href if href else ""
-
-        # Постер от onmouseover
-        onmouseover = a_tag.get("onmouseover", "")
-        poster = ""
-        if "https://" in onmouseover:
-            try:
-                poster = onmouseover.split('"')[1]
-            except:
-                pass
-
-        metas.append({
-            "id": full_url,  # тук слагаме пълния URL
-            "name": title,
-            "type": type,
-            "poster": poster or "https://arenabg.com/favicon.ico"
-        })
-
-    return {"metas": metas}
-
+async def catalog(type: str, id: str, search: str = None):
+    if search:
+        results = arenabg.search(search)
+    else:
+        results = []  # може да добавиш избрани филми, ако искаш
+    return {
+        "metas": results
+    }
 
 @app.get("/stream/{type}/{id}.json")
-def stream(type: str, id: str):
-    if not logged_in:
+async def stream(type: str, id: str):
+    id_decoded = unquote(id)
+    if not id_decoded.startswith("http"):
+        # Ако не е валиден URL, върни празен отговор
         return {"streams": []}
 
-    url = unquote(id)  # decode URL-encoded id
+    r = arenabg.session.get(id_decoded)
+    if not r.ok:
+        return {"streams": []}
 
-    r = arenabg.session.get(url)
+    # Парсирай страницата, за да извлечеш magnet линкове
     soup = BeautifulSoup(r.text, "html.parser")
-
-    magnet = ""
-    for a in soup.find_all("a", href=True):
-        if a["href"].startswith("magnet:"):
-            magnet = a["href"]
-            break
-
     streams = []
-    if magnet:
-        info_hash = extract_info_hash(magnet)
+
+    # Примерно търсене на magnet линкове в страницата
+    for a in soup.select('a[href^="magnet:"]'):
+        magnet = a["href"]
+        title = a.get_text(strip=True) or "Torrent"
         streams.append({
-            "title": "ArenaBG",
-            "infoHash": info_hash,
-            "fileIdx": 0,
-            "url": magnet
+            "title": title,
+            "url": magnet,
+            "infoHash": "",  # Можеш да извлечеш infoHash от magnet ако искаш
         })
 
     return {"streams": streams}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=10000)
