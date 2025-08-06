@@ -73,7 +73,7 @@ def catalog(type: str, id: str, search: str = ""):
         return JSONResponse(content={"metas": []})
 
     query = urllib.parse.quote_plus(search)
-    url = f"{BASE_URL}/torrents?q={query}"
+    url = f"{BASE_URL}/bg/torrents/?text={query}"
 
     headers = {"User-Agent": "Mozilla/5.0"}
     r = session.get(url, headers=headers)
