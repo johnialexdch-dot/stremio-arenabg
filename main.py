@@ -98,38 +98,36 @@ def catalog(type: str, id: str, search: str = ""):
     html = arenabg.search_torrents(search)
     soup = BeautifulSoup(html, "html.parser")
 
+    rows = soup.find_all("tr")
     metas = []
-    rows = soup.select("table.table-hover tbody tr")
+
     for row in rows[:20]:
-        cols = row.find_all("td")
-        if len(cols) < 2:
+        a_tag = row.find("a", class_="title")
+        if not a_tag:
             continue
 
-        title_tag = cols[1].find("a")
-        if not title_tag:
-            continue
+        title = a_tag.text.strip()
+        href = a_tag.get("href")
+        full_url = BASE_URL + href if href else ""
 
-        title = title_tag.text.strip()
-        link = title_tag.get("href")
-        full_link = BASE_URL + link
-
-        # 🔽 Извличане на изображението от onmouseover
-        onmouseover = title_tag.get("onmouseover", "")
+        # Постер от onmouseover
+        onmouseover = a_tag.get("onmouseover", "")
         poster = ""
         if "https://" in onmouseover:
             try:
                 poster = onmouseover.split('"')[1]
             except:
-                poster = ""
+                pass
 
         metas.append({
-            "id": full_link,
+            "id": full_url,
             "name": title,
             "type": type,
             "poster": poster or "https://arenabg.com/favicon.ico"
         })
 
     return {"metas": metas}
+
 
 @app.get("/stream/{type}/{id}.json")
 def stream(type: str, id: str):
