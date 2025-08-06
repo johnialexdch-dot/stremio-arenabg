@@ -1,5 +1,4 @@
 from fastapi import FastAPI
-from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from bs4 import BeautifulSoup
 import requests
@@ -21,6 +20,8 @@ LOGIN_URL = f"{BASE_URL}/bg/users/signin/"
 
 ARENABG_USERNAME = "uxada"
 ARENABG_PASSWORD = "P@rola123456"
+
+TMDB_API_KEY = "5e812cae5bcf352dd5db9a0ca437fd17"  # <-- смени го с твоя ключ от TMDb
 
 class ArenaBGSession:
     def __init__(self, username, password):
@@ -73,6 +74,24 @@ def extract_info_hash(magnet_link):
         pass
     return ""
 
+def imdb_to_title(imdb_id: str) -> str:
+    url = f"https://api.themoviedb.org/3/find/{imdb_id}"
+    params = {
+        "api_key": TMDB_API_KEY,
+        "external_source": "imdb_id"
+    }
+    resp = requests.get(url, params=params)
+    if resp.status_code != 200:
+        print(f"TMDb API error: {resp.status_code}")
+        return ""
+    data = resp.json()
+    if data.get("movie_results"):
+        return data["movie_results"][0]["title"]
+    elif data.get("tv_results"):
+        return data["tv_results"][0]["name"]
+    else:
+        return ""
+
 @app.get("/")
 def root():
     return {"status": "ArenaBG addon is running"}
@@ -92,24 +111,28 @@ def manifest():
             "name": "ArenaBG Search",
             "extra": [{"name": "search", "isRequired": True}]
         }],
-        "idPrefixes": ["tt"],
+        "idPrefixes": ["https://arenabg.com/"],  # Важна част - използваме пълните URL-та като id
         "behaviorHints": {"configurationRequired": False}
     }
 
 @app.get("/catalog/{type}/{id}.json")
 def catalog(type: str, id: str, search: str = ""):
+    print(f"catalog called with type={type}, id={id}, search={search}")
     if not logged_in:
+        print("Not logged in")
         return {"metas": []}
 
     if id != "arenabg_catalog" or not search:
+        print("Invalid id or empty search")
         return {"metas": []}
 
     html = arenabg.search_torrents(search)
     soup = BeautifulSoup(html, "html.parser")
 
     rows = soup.find_all("tr")
-    metas = []
+    print(f"Found {len(rows)} rows")
 
+    metas = []
     for row in rows[:20]:
         a_tag = row.find("a", class_="title")
         if not a_tag:
@@ -119,7 +142,6 @@ def catalog(type: str, id: str, search: str = ""):
         href = a_tag.get("href")
         full_url = BASE_URL + href if href else ""
 
-        # Постер от onmouseover
         onmouseover = a_tag.get("onmouseover", "")
         poster = ""
         if "https://" in onmouseover:
@@ -129,23 +151,46 @@ def catalog(type: str, id: str, search: str = ""):
                 pass
 
         metas.append({
-            "id": full_url,  # тук слагаме пълния URL
+            "id": full_url,
             "name": title,
             "type": type,
             "poster": poster or "https://arenabg.com/favicon.ico"
         })
 
+    print(f"Returning {len(metas)} metas")
     return {"metas": metas}
-
 
 @app.get("/stream/{type}/{id}.json")
 def stream(type: str, id: str):
     if not logged_in:
         return {"streams": []}
 
-    url = unquote(id)  # decode URL-encoded id
+    search_query = id
+    # Ако ид започва с tt (IMDb ID), търсим заглавието от TMDb
+    if id.startswith("tt"):
+        search_query = imdb_to_title(id)
+        if not search_query:
+            print(f"Не можа да намери заглавие за IMDb ID {id}")
+            return {"streams": []}
+        print(f"TMDb title for {id}: {search_query}")
 
-    r = arenabg.session.get(url)
+    # Търсим торентите по заглавието (или по самия id, ако не е tt)
+    html = arenabg.search_torrents(search_query)
+    soup = BeautifulSoup(html, "html.parser")
+
+    first_url = None
+    rows = soup.find_all("tr")
+    for row in rows:
+        a_tag = row.find("a", class_="title")
+        if a_tag and a_tag.get("href"):
+            first_url = BASE_URL + a_tag.get("href")
+            break
+
+    if not first_url:
+        print("Няма намерен торент")
+        return {"streams": []}
+
+    r = arenabg.session.get(first_url)
     soup = BeautifulSoup(r.text, "html.parser")
 
     magnet = ""
@@ -154,14 +199,17 @@ def stream(type: str, id: str):
             magnet = a["href"]
             break
 
-    streams = []
-    if magnet:
-        info_hash = extract_info_hash(magnet)
-        streams.append({
+    if not magnet:
+        print("Няма намерен magnet линк")
+        return {"streams": []}
+
+    info_hash = extract_info_hash(magnet)
+
+    return {
+        "streams": [{
             "title": "ArenaBG",
             "infoHash": info_hash,
             "fileIdx": 0,
             "url": magnet
-        })
-
-    return {"streams": streams}
+        }]
+    }
