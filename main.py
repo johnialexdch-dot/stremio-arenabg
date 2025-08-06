@@ -86,7 +86,7 @@ def manifest():
         "name": "ArenaBG",
         "description": "Stremio адон за търсене на торенти от ArenaBG",
         "resources": ["catalog", "stream"],
-        "streamsExtra": [{"name": "url", "isRequired": True}],
+        "streamsExtra": [{"name": "url", "isRequired": True}],  # <- Добавено тук
         "types": ["movie", "series"],
         "catalogs": [{
             "type": "movie",
@@ -174,4 +174,3 @@ def stream(type: str, url: str = Query(...)):
 def stream_with_id(type: str, id: str):
     # Връщаме празен отговор, за да не дава 404
     return {"streams": []}
-
