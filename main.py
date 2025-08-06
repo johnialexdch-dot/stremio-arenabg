@@ -3,10 +3,46 @@ from fastapi.responses import JSONResponse
 from bs4 import BeautifulSoup
 import requests
 import urllib.parse
+import os
+from dotenv import load_dotenv
 
-app = FastAPI()
+# Зареждаме .env
+load_dotenv()
+
+USERNAME = os.getenv("ARENABG_USERNAME")
+PASSWORD = os.getenv("ARENABG_PASSWORD")
 
 BASE_URL = "https://arenabg.com"
+LOGIN_URL = f"{BASE_URL}/bg/users/signin/"
+
+session = requests.Session()
+app = FastAPI()
+
+def login():
+    """Логване в ArenaBG със session"""
+    try:
+        session.get(LOGIN_URL)  # взимане на cookies
+        payload = {
+            "username_or_email": USERNAME,
+            "password": PASSWORD
+        }
+        headers = {
+            "User-Agent": "Mozilla/5.0",
+            "Referer": LOGIN_URL
+        }
+        response = session.post(LOGIN_URL, data=payload, headers=headers)
+        return response.status_code == 200 and "Изход" in response.text
+    except Exception as e:
+        print("Login error:", e)
+        return False
+
+@app.on_event("startup")
+def startup_event():
+    success = login()
+    if success:
+        print("✅ Успешен вход в ArenaBG")
+    else:
+        print("❌ НЕуспешен вход в ArenaBG")
 
 @app.get("/")
 def root():
@@ -27,7 +63,7 @@ def manifest():
             "name": "ArenaBG Search",
             "extra": [{"name": "search", "isRequired": True}]
         }],
-        "idPrefixes": ["arenabg"],
+        "idPrefixes": ["tt"],
         "behaviorHints": {"configurationRequired": False}
     }
 
@@ -40,10 +76,7 @@ def catalog(type: str, id: str, search: str = ""):
     url = f"{BASE_URL}/torrents?q={query}"
 
     headers = {"User-Agent": "Mozilla/5.0"}
-    r = requests.get(url, headers=headers)
-    if r.status_code != 200:
-        return JSONResponse(content={"metas": []})
-
+    r = session.get(url, headers=headers)
     soup = BeautifulSoup(r.text, "html.parser")
 
     metas = []
@@ -55,14 +88,8 @@ def catalog(type: str, id: str, search: str = ""):
             continue
 
         title_tag = cols[1].find("a")
-        if not title_tag:
-            continue
-
         title = title_tag.text.strip()
         link = title_tag.get("href")
-        if not link:
-            continue
-
         full_link = BASE_URL + link
 
         metas.append({
@@ -74,16 +101,12 @@ def catalog(type: str, id: str, search: str = ""):
 
     return JSONResponse(content={"metas": metas})
 
-
 @app.get("/stream/{type}/{id}.json")
 def stream(type: str, id: str):
     url = urllib.parse.unquote(id)
 
     headers = {"User-Agent": "Mozilla/5.0"}
-    r = requests.get(url, headers=headers)
-    if r.status_code != 200:
-        return JSONResponse(content={"streams": []})
-
+    r = session.get(url, headers=headers)
     soup = BeautifulSoup(r.text, "html.parser")
 
     magnet = ""
