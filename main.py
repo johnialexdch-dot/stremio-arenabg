@@ -9,7 +9,7 @@ app = FastAPI()
 BASE_URL = "https://arenabg.com"
 LOGIN_URL = f"{BASE_URL}/bg/users/signin/"
 
-# Въведете вашите ArenaBG потребител и парола тук
+# ЗАДАЙ си правилно потребител и парола тук
 ARENABG_USERNAME = "uxada"
 ARENABG_PASSWORD = "P@rola123456"
 
@@ -44,10 +44,14 @@ class ArenaBGSession:
 
     def search_torrents(self, query):
         search_url = f"{BASE_URL}/bg/torrents/?text={urllib.parse.quote_plus(query)}"
-        resp = self.session.get(search_url)
-        return resp.text
+        headers = {
+            "User-Agent": "Mozilla/5.0"
+        }
+        r = self.session.get(search_url, headers=headers)
+        print(f"Search page status: {r.status_code}")
+        print("Search page HTML preview:", r.text[:1000])
+        return r.text
 
-# Създаваме сесия и логваме веднъж при стартиране на приложението
 arenabg = ArenaBGSession(ARENABG_USERNAME, ARENABG_PASSWORD)
 logged_in = arenabg.login()
 
@@ -76,10 +80,7 @@ def manifest():
 
 @app.get("/catalog/{type}/{id}.json")
 def catalog(type: str, id: str, search: str = ""):
-    if not logged_in:
-        return JSONResponse(content={"metas": []})
-
-    if id != "arenabg_catalog" or not search:
+    if not logged_in or id != "arenabg_catalog" or not search:
         return JSONResponse(content={"metas": []})
 
     html = arenabg.search_torrents(search)
@@ -87,7 +88,7 @@ def catalog(type: str, id: str, search: str = ""):
 
     metas = []
     rows = soup.select("table.table-hover tbody tr")
-    for row in rows[:20]:  # лимит до 20 резултата
+    for row in rows[:20]:
         cols = row.find_all("td")
         if len(cols) < 2:
             continue
@@ -101,28 +102,20 @@ def catalog(type: str, id: str, search: str = ""):
         full_link = BASE_URL + link
 
         metas.append({
-            "id": full_link,
+            "id": urllib.parse.quote(full_link),
             "name": title,
             "type": type,
             "poster": "https://arenabg.com/favicon.ico"
         })
 
-r = self.session.get(url, headers=headers)
-print(f"Search page status: {r.status_code}")
-print("Search page HTML preview:", r.text[:1000])  # показва първите 1000 символа
-# ... обработка и връщане на резултати ...
-
-return JSONResponse(content={"metas": metas})
-
+    return JSONResponse(content={"metas": metas})
 
 @app.get("/stream/{type}/{id}.json")
 def stream(type: str, id: str):
-    # id е пълния URL от catalog-а, трябва да го декодираме
-    url = urllib.parse.unquote(id)
-
     if not logged_in:
         return JSONResponse(content={"streams": []})
 
+    url = urllib.parse.unquote(id)
     r = arenabg.session.get(url)
     soup = BeautifulSoup(r.text, "html.parser")
 
