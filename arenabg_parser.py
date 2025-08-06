@@ -1,34 +1,34 @@
 from bs4 import BeautifulSoup
+import re
 
 def parse_arenabg_html(html: str) -> list:
     soup = BeautifulSoup(html, 'html.parser')
-    rows = soup.select('table > tbody > tr')
     metas = []
 
-    for row in rows:
+    # Вземи всички линкове към торенти (заглавия)
+    for a in soup.find_all("a", class_="title"):
         try:
-            title_cell = row.select_one('td.filename a.title')
-            if not title_cell:
+            title = a.get_text(strip=True)
+            relative_url = a.get("href")
+            if not relative_url:
                 continue
 
-            title = title_cell.text.strip()
-            relative_url = title_cell['href']
             torrent_url = f"https://arenabg.com{relative_url}"
 
-            poster_url = ""
-            if "onmouseover" in title_cell.attrs:
-                hover = title_cell['onmouseover']
-                if 'https://' in hover:
-                    poster_url = hover.split('"')[1]
+            # Извличане на постер URL от onmouseover JS атрибута
+            onmouseover = a.get("onmouseover", "")
+            poster_match = re.search(r"https:\\/\\/[^\\\"]+", onmouseover)
+            poster_url = poster_match.group(0).replace("\\/", "/") if poster_match else ""
 
             metas.append({
                 "id": torrent_url,
-                "type": "movie",
+                "type": "movie",   # може да се адаптира според категорията
                 "name": title,
                 "poster": poster_url,
             })
+
         except Exception as e:
-            print("Грешка при парсинг на ред:", e)
+            print("Грешка при парсинг на елемент:", e)
             continue
 
     return metas
