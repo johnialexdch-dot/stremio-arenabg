@@ -137,13 +137,22 @@ def stream(type: str, id: str):
         return {"streams": []}
 
     r = arenabg.session.get(url)
-    soup = BeautifulSoup(r.text, "html.parser")
+    html = r.text
+
+    print("Stream page HTML preview:", html[:2000])  # показва първите 2000 символа
+
+    soup = BeautifulSoup(html, "html.parser")
 
     magnet = ""
     for a in soup.find_all("a", href=True):
         if a["href"].startswith("magnet:"):
             magnet = a["href"]
             break
+
+    if magnet:
+        print("Magnet link found:", magnet)
+    else:
+        print("No magnet link found.")
 
     streams = []
     if magnet:
@@ -156,3 +165,4 @@ def stream(type: str, id: str):
         })
 
     return {"streams": streams}
+
