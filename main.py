@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from bs4 import BeautifulSoup
+from arenabg_parser import parse_arenabg_html
 import requests
 import urllib.parse
 
