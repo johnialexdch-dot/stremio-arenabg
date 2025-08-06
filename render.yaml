@@ -6,8 +6,8 @@ services:
     startCommand: "uvicorn main:app --host 0.0.0.0 --port 10000"
     envVars:
       - key: ARENABG_USERNAME
-        value: your_username_here
+        value: uxada
       - key: ARENABG_PASSWORD
-        value: your_password_here
+        value: P@rola123456
     autoDeploy: true
     plan: free
