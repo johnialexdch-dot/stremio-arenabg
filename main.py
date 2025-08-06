@@ -107,11 +107,13 @@ def catalog(type: str, id: str, search: str = ""):
             "poster": "https://arenabg.com/favicon.ico"
         })
 
-    return JSONResponse(content={"metas": metas})
-     r = self.session.get(url, headers=headers)
-    print(f"Search page status: {r.status_code}")
-    print("Search page HTML preview:", r.text[:1000])  # показва първите 1000 символа
-    # ... обработка и връщане на резултати ...
+r = self.session.get(url, headers=headers)
+print(f"Search page status: {r.status_code}")
+print("Search page HTML preview:", r.text[:1000])  # показва първите 1000 символа
+# ... обработка и връщане на резултати ...
+
+return JSONResponse(content={"metas": metas})
+
 
 @app.get("/stream/{type}/{id}.json")
 def stream(type: str, id: str):
