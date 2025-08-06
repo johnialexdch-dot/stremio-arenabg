@@ -4,6 +4,7 @@ from bs4 import BeautifulSoup
 import requests
 import urllib.parse
 
+
 app = FastAPI()
 
 BASE_URL = "https://arenabg.com"
